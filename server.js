@@ -1,24 +1,31 @@
 const express = require('express');
 const path = require('path');
-const Database = require('better-sqlite3');
+const initSqlJs = require('sql.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize SQLite Database synchronously
-const db = new Database('./profiles.db');
-db.exec(`
-    CREATE TABLE IF NOT EXISTS profiles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        bio TEXT,
-        skills TEXT,
-        github TEXT,
-        linkedin TEXT
-    )
-`);
+let db;
+
+// Initialize Pure-JavaScript SQLite Database
+initSqlJs().then(SQL => {
+    db = new SQL.Database();
+    db.run(`
+        CREATE TABLE IF NOT EXISTS profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            bio TEXT,
+            skills TEXT,
+            github TEXT,
+            linkedin TEXT
+        )
+    `);
+    console.log("Database ready");
+}).catch(err => {
+    console.error("Database initialization failed:", err);
+});
 
 // Serve index.html form
 app.get('/', (req, res) => {
@@ -34,7 +41,8 @@ app.post('/create-profile', (req, res) => {
         const formattedSkills = skillsArray.join(', ');
 
         const stmt = db.prepare(`INSERT INTO profiles (name, bio, skills, github, linkedin) VALUES (?, ?, ?, ?, ?)`);
-        stmt.run(name.trim(), bio.trim(), formattedSkills, github, linkedin);
+        stmt.run([name.trim(), bio.trim(), formattedSkills, github, linkedin]);
+        stmt.free();
 
         const skillBadges = skillsArray
             .map(skill => `<span style="background: #e0e7ff; color: #3730a3; padding: 6px 12px; border-radius: 16px; font-size: 13px; font-weight: 500;">${skill}</span>`)
